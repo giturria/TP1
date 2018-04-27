@@ -38,18 +38,44 @@
 #define COMPILAR_TP1-1  /*parpadeo del LEDs*/
 #define COMPILAR_TP1-2  /*sensado de Push Buttons*/
 #define COMPILAR_TP1-3  /*uso de tickHooks*/
+#define COMPILAR_TP1-4  /*tickHooks portable*/
+#define COMPILAR_TP1-5  /*UART2 como interfaz de DEBUG*/
+#define COMPILAR_TP1-6  /*sensado de Push Buttons c/sAPI*/
 
-#define COMPILAR COMPILAR_TP1-2
-
+#define COMPILAR COMPILAR_TP1-6
 
 /*==================[inclusions]=============================================*/
 
 /*#include "TP1-1.h"  */  // <= own header (optional)
 #include "sapi.h"       // <= sAPI header
 
+#if COMPILAR==COMPILAR_TP1-4
+ /* FUNCION que se ejecuta cada vez que ocurre un Tick. */
+/* FUNCION que se ejecuta cada vez que ocurre un Tick. */
+void myTickHook( void *ptr ){
+
+   static bool_t ledState = OFF;
+
+   gpioMap_t led = (gpioMap_t)ptr;
+
+   if( ledState ){
+      ledState = OFF;
+   }
+   else{
+      ledState = ON;
+   }
+   gpioWrite( led, ledState );
+}
+#define TICKRATE_MS 100 // ms
+#define LED_TOGGLE_MS 1000 // ms
+
+#endif
+
+
 #if COMPILAR==COMPILAR_TP1-3
     #include "TP1-3.h"
     /* FUNCION que se ejecuta cada vez que ocurre un Tick. */
+/* FUNCION que se ejecuta cada vez que ocurre un Tick. */
 void myTickHook( void *ptr ){
 
    static bool_t ledState = OFF;
@@ -65,6 +91,16 @@ void myTickHook( void *ptr ){
    gpioWrite( led, ledState );
 }
 #endif
+
+
+#if COMPILAR==COMPILAR_TP1-5
+/* The DEBUG* functions are sAPI debug print functions.
+Code that uses the DEBUG* functions will have their I/O routed to
+the sAPI DEBUG UART. */
+DEBUG_PRINT_ENABLE;
+#endif
+
+
 
 
 /*==================[macros and definitions]=================================*/
@@ -90,6 +126,16 @@ int main(void){
    boardConfig();
 
 
+   /* The DEBUG* functions are sAPI debug print functions.
+   Code that uses the DEBUG* functions will have their I/O routed to
+   the sAPI DEBUG UART. */
+   DEBUG_PRINT_ENABLE;
+   /* UART for debug messages. */
+   debugPrintConfigUart( UART_USB, 115200 );
+   debugPrintString( "DEBUG c/sAPI\r\n" );
+   debugPrintString( "LED Toggle\n" );
+
+
    /* ------------- uso de tickHooks ------------- */
 #if COMPILAR==COMPILAR_TP1-3
    /* Inicializar el conteo de Ticks con resolucion de 50ms (se ejecuta
@@ -108,13 +154,29 @@ int main(void){
    tickCallbackSet( myTickHook, (void*)LEDR );
    delay(1000);
 
+#elif COMPILAR==COMPILAR_TP1-4
+   /* Inicializar el conteo de Ticks con resolucion de 50ms (se ejecuta
+      periodicamente una interrupcion cada 50ms que incrementa un contador de
+      Ticks obteniendose una base de tiempos). */
+   tickConfig( 50 );
+
+   /* Se agrega ademas un "tick hook" nombrado myTickHook. El tick hook es
+      simplemente una funcion que se ejecutara peri�odicamente con cada
+      interrupcion de Tick, este nombre se refiere a una funcion "enganchada"
+      a una interrupcion.
+      El segundo parametro es el parametro que recibe la funcion myTickHook
+      al ejecutarse. En este ejemplo se utiliza para pasarle el led a titilar.
+   */
+
+   tickCallbackSet( myTickHook, (void*)LEDR );
+   delay(TICKRATE_MS);
    /* ------------- sensado de Push Buttons ------------- */
 
 #elif COMPILAR==COMPILAR_TP1-2
 
    gpioConfig( GPIO0, GPIO_INPUT );
 
-      gpioConfig( GPIO1, GPIO_OUTPUT );
+   gpioConfig( GPIO1, GPIO_OUTPUT );
 
       /* Variable para almacenar el valor de tecla leido */
       bool_t valor;
@@ -170,6 +232,22 @@ int main(void){
             delay(1000);
             tickCallbackSet( myTickHook, (void*)LEDR );
             delay(1000);
+
+#elif COMPILAR==COMPILAR_TP1-4
+
+            tickCallbackSet( myTickHook, (void*)LEDG );
+            delay(LED_TOGGLE_MS);
+            tickCallbackSet( myTickHook, (void*)LEDB );
+            delay(LED_TOGGLE_MS);
+            tickCallbackSet( myTickHook, (void*)LED1 );
+            delay(LED_TOGGLE_MS);
+            tickCallbackSet( myTickHook, (void*)LED2 );
+            delay(LED_TOGGLE_MS);
+            tickCallbackSet( myTickHook, (void*)LED3 );
+            delay(LED_TOGGLE_MS);
+            tickCallbackSet( myTickHook, (void*)LEDR );
+            delay(LED_TOGGLE_MS);
+
 
 #endif
 
